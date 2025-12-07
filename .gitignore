@@ -25,6 +25,7 @@
 *.dylib
 backend/bin/
 backend/dist/
+backend/tmp/
 
 # Test binary, built with `go test -c`
 *.test
