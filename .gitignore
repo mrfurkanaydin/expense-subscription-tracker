@@ -1,0 +1,119 @@
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Go specific
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/bin/
+backend/dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+backend/coverage.txt
+
+# Dependency directories
+backend/vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build artifacts
+backend/*.exe
+backend/*.dll
+backend/*.so
+backend/*.dylib
+
+# Next.js specific
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+
+# Next.js cache
+frontend/.next/cache/
+
+# Next.js standalone output
+frontend/.next/standalone/
+frontend/.next/static/
+
+# Debug logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# Node modules
+frontend/node_modules/
+node_modules/
+
+# Package manager lock files (optional - uncomment if you want to ignore)
+# frontend/package-lock.json
+# frontend/yarn.lock
+# frontend/pnpm-lock.yaml
+
+# TypeScript
+*.tsbuildinfo
+frontend/.tsbuildinfo
+
+# Vercel
+frontend/.vercel
+
+# Turbo
+frontend/.turbo
+
+# Testing
+frontend/coverage/
+frontend/.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# OS files
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.backup
+*.old
+
