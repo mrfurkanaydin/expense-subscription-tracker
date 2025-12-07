@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/db"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/expenses"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/subscriptions"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/users"
 )
 
@@ -48,6 +49,23 @@ func main() {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	subRepo := subscriptions.NewPostgresRepository()
+	subHandler := subscriptions.NewHandler(subRepo)
+
+	mux.HandleFunc("/subscriptions", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			subHandler.Create(w, r)
+		case http.MethodGet:
+			subHandler.GetByUserID(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// start reminder checker
+	subscriptions.StartReminderChecker(subRepo)
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
