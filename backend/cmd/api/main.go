@@ -6,6 +6,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/db"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/expenses"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/users"
 )
 
@@ -33,6 +34,20 @@ func main() {
 	userHandler := users.NewHandler(userRepo)
 
 	mux.HandleFunc("/users", userHandler.Create)
+
+	expenseRepo := expenses.NewPostgresRepository()
+	expenseHandler := expenses.NewHandler(expenseRepo)
+
+	mux.HandleFunc("/expenses", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			expenseHandler.Create(w, r)
+		case http.MethodGet:
+			expenseHandler.GetByUserID(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
