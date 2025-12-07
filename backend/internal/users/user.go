@@ -3,7 +3,7 @@ package users
 import "time"
 
 type User struct {
-	ID        string
-	Email     string
-	CreatedAt time.Time
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
 }
