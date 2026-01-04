@@ -7,6 +7,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/db"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/expenses"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/investments"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/market"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/middleware"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/subscriptions"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/users"
@@ -55,6 +57,10 @@ func main() {
 			expenseHandler.Create(w, r)
 		case http.MethodGet:
 			expenseHandler.GetByUserID(w, r)
+		case http.MethodPut:
+			expenseHandler.Update(w, r)
+		case http.MethodDelete:
+			expenseHandler.Delete(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -69,7 +75,49 @@ func main() {
 			subHandler.Create(w, r)
 		case http.MethodGet:
 			subHandler.GetByUserID(w, r)
+		case http.MethodPut:
+			subHandler.Update(w, r)
+		case http.MethodDelete:
+			subHandler.Delete(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// Investments
+	invRepo := investments.NewPostgresRepository()
+	invHandler := investments.NewHandler(invRepo)
+
+	mux.HandleFunc("/investments", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			invHandler.Create(w, r)
+		case http.MethodGet:
+			invHandler.GetByUserID(w, r)
+		case http.MethodPut:
+			invHandler.Update(w, r)
+		case http.MethodDelete:
+			invHandler.Delete(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// Market Data
+	marketService := market.NewService()
+	marketHandler := market.NewHandler(marketService)
+	mux.HandleFunc("/market/gold", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			marketHandler.GetGoldPrices(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/market/stock", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			marketHandler.GetStockPrice(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))

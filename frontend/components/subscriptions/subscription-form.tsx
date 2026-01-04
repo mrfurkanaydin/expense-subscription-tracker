@@ -16,6 +16,7 @@ const subscriptionSchema = z.object({
   currency: z.enum(["TRY", "USD", "EUR", "GBP"]),
   billing_period: z.enum(["monthly", "yearly"]),
   next_billing_at: z.string().min(1, "Yenileme tarihi gereklidir"),
+  start_date: z.string().optional(),
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionSchema>;
@@ -44,6 +45,7 @@ export function SubscriptionForm({
       currency: "TRY",
       billing_period: "monthly",
       next_billing_at: new Date().toISOString().split("T")[0],
+      start_date: new Date().toISOString().split("T")[0],
     },
   });
 
@@ -57,6 +59,7 @@ export function SubscriptionForm({
         user_id: userId,
         ...data,
         next_billing_at: nextBillingDate.toISOString(),
+        start_date: data.start_date ? new Date(data.start_date).toISOString() : undefined,
       };
       await createSubscription(request);
       reset();
@@ -141,6 +144,26 @@ export function SubscriptionForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label
+                htmlFor="start_date"
+                className="block text-sm font-medium mb-1.5"
+              >
+                Başlangıç Tarihi
+              </label>
+              <input
+                id="start_date"
+                type="date"
+                {...register("start_date")}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {errors.start_date && (
+                <p className="text-xs text-red-600 mt-1">
+                  {errors.start_date.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
                 htmlFor="billing_period"
                 className="block text-sm font-medium mb-1.5"
               >
@@ -158,26 +181,26 @@ export function SubscriptionForm({
                 ))}
               </select>
             </div>
+          </div>
 
-            <div>
-              <label
-                htmlFor="next_billing_at"
-                className="block text-sm font-medium mb-1.5"
-              >
-                Sonraki Ödeme Tarihi
-              </label>
-              <input
-                id="next_billing_at"
-                type="date"
-                {...register("next_billing_at")}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              {errors.next_billing_at && (
-                <p className="text-xs text-red-600 mt-1">
-                  {errors.next_billing_at.message}
-                </p>
-              )}
-            </div>
+          <div>
+            <label
+              htmlFor="next_billing_at"
+              className="block text-sm font-medium mb-1.5"
+            >
+              Sonraki Ödeme Tarihi
+            </label>
+            <input
+              id="next_billing_at"
+              type="date"
+              {...register("next_billing_at")}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {errors.next_billing_at && (
+              <p className="text-xs text-red-600 mt-1">
+                {errors.next_billing_at.message}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2 pt-2">

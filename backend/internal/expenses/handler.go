@@ -86,3 +86,73 @@ func (h *Handler) GetByUserID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(expenses)
 }
+
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id query param required", http.StatusBadRequest)
+		return
+	}
+
+	existing, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "expense not found", http.StatusNotFound)
+		return
+	}
+
+	var req createExpenseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	// Update fields if provided (assuming full update or partial if logic allows, simplified here)
+	if req.Title != "" {
+		existing.Title = req.Title
+	}
+	if req.Amount > 0 {
+		existing.Amount = req.Amount
+	}
+	if req.Currency != "" {
+		existing.Currency = req.Currency
+	}
+	if req.Category != "" {
+		existing.Category = req.Category
+	}
+
+	updated, err := h.repo.Update(r.Context(), id, existing)
+	if err != nil {
+		http.Error(w, "could not update expense", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id query param required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.repo.Delete(r.Context(), id)
+	if err != nil {
+		http.Error(w, "could not delete expense", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}

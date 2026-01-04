@@ -11,6 +11,8 @@ const navigation = [
   { name: "Dashboard", href: "/" },
   { name: "Giderler", href: "/expenses" },
   { name: "Abonelikler", href: "/subscriptions" },
+  { name: "Yatırımlar", href: "/investments" },
+  { name: "Raporlar", href: "/reports" },
 ];
 
 export function Header() {
@@ -40,21 +42,21 @@ export function Header() {
             {navigation.map((item) => {
               const isActive = pathname === item.href;
               return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200 hover:scale-105 sm:px-4 relative",
-                  isActive
-                    ? "text-brand bg-gradient-to-r from-brand/10 to-accent/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                {item.name}
-                {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand to-accent rounded-full" />
-                )}
-              </Link>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200 hover:scale-105 sm:px-4 relative",
+                    isActive
+                      ? "text-brand bg-gradient-to-r from-brand/10 to-accent/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {item.name}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand to-accent rounded-full" />
+                  )}
+                </Link>
               );
             })}
           </nav>

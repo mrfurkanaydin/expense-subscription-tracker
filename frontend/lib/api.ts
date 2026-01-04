@@ -4,6 +4,8 @@ import type {
   User,
   CreateExpenseRequest,
   CreateSubscriptionRequest,
+  UpdateExpenseRequest,
+  UpdateSubscriptionRequest,
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -58,6 +60,21 @@ export async function createExpense(
   });
 }
 
+export async function updateExpense(
+  data: UpdateExpenseRequest
+): Promise<Expense> {
+  return fetchAPI<Expense>(`/expenses?id=${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  return fetchAPI<void>(`/expenses?id=${id}`, {
+    method: "DELETE",
+  });
+}
+
 // Subscriptions API
 export async function getSubscriptions(
   userId: string
@@ -74,8 +91,22 @@ export async function createSubscription(
   });
 }
 
+export async function updateSubscription(
+  data: UpdateSubscriptionRequest
+): Promise<Subscription> {
+  return fetchAPI<Subscription>(`/subscriptions?id=${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSubscription(id: string): Promise<void> {
+  return fetchAPI<void>(`/subscriptions?id=${id}`, {
+    method: "DELETE",
+  });
+}
+
 // Health check
 export async function healthCheck(): Promise<{ status: string }> {
   return fetchAPI<{ status: string }>("/health");
 }
-

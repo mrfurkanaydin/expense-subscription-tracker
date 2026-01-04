@@ -53,3 +53,41 @@ func (r *PostgresRepository) GetByUserID(ctx context.Context, userID string) ([]
 
 	return expenses, nil
 }
+
+func (r *PostgresRepository) Update(ctx context.Context, id string, e *Expense) (*Expense, error) {
+	row := db.Pool.QueryRow(ctx,
+		`UPDATE expenses 
+		 SET title=$1, amount=$2, currency=$3, category=$4
+		 WHERE id=$5
+		 RETURNING id, user_id, title, amount, currency, category, created_at`,
+		e.Title, e.Amount, e.Currency, e.Category, id,
+	)
+
+	var exp Expense
+	err := row.Scan(&exp.ID, &exp.UserID, &exp.Title, &exp.Amount, &exp.Currency, &exp.Category, &exp.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &exp, nil
+}
+
+func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
+	_, err := db.Pool.Exec(ctx, "DELETE FROM expenses WHERE id=$1", id)
+	return err
+}
+
+func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*Expense, error) {
+	row := db.Pool.QueryRow(ctx,
+		`SELECT id, user_id, title, amount, currency, category, created_at
+		 FROM expenses
+		 WHERE id=$1`, id)
+
+	var exp Expense
+	err := row.Scan(&exp.ID, &exp.UserID, &exp.Title, &exp.Amount, &exp.Currency, &exp.Category, &exp.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &exp, nil
+}

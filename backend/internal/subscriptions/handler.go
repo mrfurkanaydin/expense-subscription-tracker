@@ -23,6 +23,8 @@ type createSubscriptionRequest struct {
 	Currency      string  `json:"currency"`
 	BillingPeriod string  `json:"billing_period"`  // monthly / yearly
 	NextBillingAt string  `json:"next_billing_at"` // ISO timestamp
+	StartDate     string  `json:"start_date"`      // ISO timestamp, optional
+	EndDate       string  `json:"end_date"`        // ISO timestamp, optional
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +52,35 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	nextBilling, err := time.Parse(time.RFC3339, req.NextBillingAt)
 	if err != nil {
-		http.Error(w, "invalid next_billing_at", http.StatusBadRequest)
-		return
+		// Try parsing YYYY-MM-DD
+		nextBilling, err = time.Parse("2006-01-02", req.NextBillingAt)
+		if err != nil {
+			http.Error(w, "invalid next_billing_at", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// StartDate default to today if not provided
+	startDate := time.Now()
+	if req.StartDate != "" {
+		parsed, err := time.Parse(time.RFC3339, req.StartDate)
+		if err != nil {
+			parsed, err = time.Parse("2006-01-02", req.StartDate)
+		}
+		if err == nil {
+			startDate = parsed
+		}
+	}
+
+	var endDate *time.Time
+	if req.EndDate != "" {
+		parsed, err := time.Parse(time.RFC3339, req.EndDate)
+		if err != nil {
+			parsed, err = time.Parse("2006-01-02", req.EndDate)
+		}
+		if err == nil {
+			endDate = &parsed
+		}
 	}
 
 	sub := &Subscription{
@@ -61,6 +90,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Currency:      req.Currency,
 		BillingPeriod: req.BillingPeriod,
 		NextBillingAt: nextBilling,
+		StartDate:     startDate,
+		EndDate:       endDate,
 		Active:        true,
 	}
 
@@ -94,4 +125,118 @@ func (h *Handler) GetByUserID(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(subs)
+}
+
+type updateSubscriptionRequest struct {
+	Title         *string  `json:"title"`
+	Amount        *float64 `json:"amount"`
+	Currency      *string  `json:"currency"`
+	BillingPeriod *string  `json:"billing_period"`
+	NextBillingAt *string  `json:"next_billing_at"`
+	StartDate     *string  `json:"start_date"`
+	EndDate       *string  `json:"end_date"`
+	Active        *bool    `json:"active"`
+}
+
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id query param required", http.StatusBadRequest)
+		return
+	}
+
+	existing, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "subscription not found", http.StatusNotFound)
+		return
+	}
+
+	var req updateSubscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title != nil {
+		existing.Title = *req.Title
+	}
+	if req.Amount != nil && *req.Amount > 0 {
+		existing.Amount = *req.Amount
+	}
+	if req.Currency != nil {
+		existing.Currency = *req.Currency
+	}
+	if req.BillingPeriod != nil && (*req.BillingPeriod == "monthly" || *req.BillingPeriod == "yearly") {
+		existing.BillingPeriod = *req.BillingPeriod
+	}
+	if req.NextBillingAt != nil {
+		nextBilling, err := time.Parse(time.RFC3339, *req.NextBillingAt)
+		if err != nil {
+			nextBilling, err = time.Parse("2006-01-02", *req.NextBillingAt)
+		}
+		if err == nil {
+			existing.NextBillingAt = nextBilling
+		}
+	}
+	if req.StartDate != nil {
+		parsed, err := time.Parse(time.RFC3339, *req.StartDate)
+		if err != nil {
+			parsed, err = time.Parse("2006-01-02", *req.StartDate)
+		}
+		if err == nil {
+			existing.StartDate = parsed
+		}
+	}
+	if req.EndDate != nil {
+		if *req.EndDate == "" {
+			existing.EndDate = nil // Clear end date
+		} else {
+			parsed, err := time.Parse(time.RFC3339, *req.EndDate)
+			if err != nil {
+				parsed, err = time.Parse("2006-01-02", *req.EndDate)
+			}
+			if err == nil {
+				existing.EndDate = &parsed
+			}
+		}
+	}
+	if req.Active != nil {
+		existing.Active = *req.Active
+	}
+
+	updated, err := h.repo.Update(r.Context(), id, existing)
+	if err != nil {
+		http.Error(w, "could not update subscription", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id query param required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.repo.Delete(r.Context(), id)
+	if err != nil {
+		http.Error(w, "could not delete subscription", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 }

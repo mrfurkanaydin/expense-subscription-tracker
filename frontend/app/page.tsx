@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,15 +9,22 @@ import { StatsCard } from "@/components/dashboard/stats-card";
 import { UserGuard } from "@/components/user/user-guard";
 import {
   TrendingUp,
+  TrendingDown,
   Wallet,
   CreditCard,
   Calendar,
   Plus,
   ArrowRight,
+  PieChart,
+  Gem,
+  Target,
 } from "lucide-react";
 import { getExpenses, getSubscriptions } from "@/lib/api";
+import { getInvestments } from "@/lib/api/investments";
+import { getMarketPricesAsync, convertToTRY } from "@/lib/api/market-data";
 import { useUser } from "@/contexts/user-context";
 import type { Expense, Subscription } from "@/lib/types";
+import type { Investment, MarketPrice } from "@/lib/types/investments";
 import {
   formatCurrency,
   formatDateShort,
@@ -27,11 +34,15 @@ import {
   calculateYearlyRecurring,
   getUpcomingSubscriptions,
 } from "@/lib/utils/format";
+import { filterByDateRange, groupByCategory } from "@/lib/utils/analytics";
+import { cn } from "@/lib/utils";
 
 function DashboardContent() {
   const { user } = useUser();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [marketPrices, setMarketPrices] = useState<Map<string, MarketPrice>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,12 +57,21 @@ function DashboardContent() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [expensesData, subscriptionsData] = await Promise.all([
+        const [expensesData, subscriptionsData, investmentsData] = await Promise.all([
           getExpenses(userId),
           getSubscriptions(userId),
+          getInvestments(userId).catch(() => []),
         ]);
-        setExpenses(expensesData);
-        setSubscriptions(subscriptionsData);
+        setExpenses(Array.isArray(expensesData) ? expensesData : []);
+        setSubscriptions(Array.isArray(subscriptionsData) ? subscriptionsData : []);
+        setInvestments(Array.isArray(investmentsData) ? investmentsData : []);
+
+        // Fetch market prices for investments
+        if (investmentsData.length > 0) {
+          const symbols = investmentsData.map((inv: Investment) => inv.symbol);
+          const prices = await getMarketPricesAsync([...new Set(symbols)]);
+          setMarketPrices(prices);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Bir hata oluştu");
       } finally {
@@ -61,6 +81,59 @@ function DashboardContent() {
 
     fetchData();
   }, [user]);
+
+  // Calculate portfolio summary
+  const portfolioSummary = useMemo(() => {
+    let totalValue = 0;
+    let totalCost = 0;
+    let topGainer: { name: string; profit: number; percent: number } | null = null;
+    let topLoser: { name: string; loss: number; percent: number } | null = null;
+
+    for (const inv of investments) {
+      const marketPrice = marketPrices.get(inv.symbol);
+      const currentPrice = marketPrice?.price || inv.purchase_price;
+      const currentPriceTRY = convertToTRY(currentPrice, marketPrice?.currency || inv.purchase_currency);
+      const purchasePriceTRY = convertToTRY(inv.purchase_price, inv.purchase_currency);
+
+      const value = inv.quantity * currentPriceTRY;
+      const cost = inv.quantity * purchasePriceTRY;
+      const profit = value - cost;
+      const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
+
+      totalValue += value;
+      totalCost += cost;
+
+      if (profit > 0 && (!topGainer || profit > topGainer.profit)) {
+        topGainer = { name: inv.name, profit, percent: profitPercent };
+      }
+      if (profit < 0 && (!topLoser || profit < topLoser.loss)) {
+        topLoser = { name: inv.name, loss: profit, percent: profitPercent };
+      }
+    }
+
+    return {
+      totalValue,
+      totalCost,
+      totalProfitLoss: totalValue - totalCost,
+      totalProfitLossPercent: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
+      topGainer,
+      topLoser,
+    };
+  }, [investments, marketPrices]);
+
+  // This month expenses
+  const thisMonthExpenses = useMemo(() => {
+    return filterByDateRange(expenses, "this-month");
+  }, [expenses]);
+
+  const thisMonthTotal = useMemo(() => {
+    return thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
+  }, [thisMonthExpenses]);
+
+  // Category breakdown
+  const categoryData = useMemo(() => {
+    return groupByCategory(thisMonthExpenses).slice(0, 3);
+  }, [thisMonthExpenses]);
 
   if (loading) {
     return (
@@ -92,6 +165,7 @@ function DashboardContent() {
     )
     .slice(0, 5);
   const upcomingSubscriptions = getUpcomingSubscriptions(subscriptions, 5);
+  const isPortfolioPositive = portfolioSummary.totalProfitLoss >= 0;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -102,7 +176,7 @@ function DashboardContent() {
             Dashboard
           </h1>
           <p className="text-muted-foreground mt-2 font-medium">
-            Giderlerinizi ve aboneliklerinizi takip edin
+            Finansal durumunuzu tek bakışta görün
           </p>
         </div>
         <div className="flex gap-2">
@@ -113,39 +187,157 @@ function DashboardContent() {
             </Link>
           </Button>
           <Button asChild size="sm">
-            <Link href="/subscriptions">
+            <Link href="/investments">
               <Plus className="h-4 w-4 mr-2" />
-              Abonelik Ekle
+              Yatırım Ekle
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Main Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Toplam Gider"
-          value={formatCurrency(totalExpenses, "TRY")}
-          icon={TrendingUp}
+          title="Bu Ay Harcama"
+          value={formatCurrency(thisMonthTotal, "TRY")}
+          description={`${thisMonthExpenses.length} işlem`}
+          icon={Calendar}
           variant="gradient"
         />
         <StatsCard
-          title="Aktif Abonelik"
-          value={activeSubscriptions.toString()}
-          description={`${subscriptions?.length} toplam`}
+          title="Toplam Gider"
+          value={formatCurrency(totalExpenses, "TRY")}
+          description={`${expenses.length} gider`}
+          icon={TrendingUp}
+        />
+        <StatsCard
+          title="Aylık Abonelik"
+          value={formatCurrency(monthlyRecurring, "TRY")}
+          description={`${activeSubscriptions} aktif`}
           icon={CreditCard}
         />
         <StatsCard
-          title="Aylık Tekrarlayan"
-          value={formatCurrency(monthlyRecurring, "TRY")}
+          title="Yıllık Tekrarlayan"
+          value={formatCurrency(yearlyRecurring, "TRY")}
           icon={Wallet}
         />
-        <StatsCard
-          title="Yıllık Toplam"
-          value={formatCurrency(yearlyRecurring, "TRY")}
-          icon={Calendar}
-        />
       </div>
+
+      {/* Portfolio + Budget Row */}
+      {investments.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Portfolio Value */}
+          <Card className="border-2 hover:border-brand/30 bg-gradient-to-br from-background to-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Gem className="h-4 w-4 text-amber-500" />
+                Portföy Değeri
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold font-mono">
+                {formatCurrency(portfolioSummary.totalValue, "TRY")}
+              </p>
+              <div
+                className={cn(
+                  "flex items-center gap-1 text-sm font-medium mt-1",
+                  isPortfolioPositive ? "text-emerald-500" : "text-red-500"
+                )}
+              >
+                {isPortfolioPositive ? (
+                  <TrendingUp className="h-4 w-4" />
+                ) : (
+                  <TrendingDown className="h-4 w-4" />
+                )}
+                <span>
+                  {isPortfolioPositive ? "+" : ""}
+                  {formatCurrency(portfolioSummary.totalProfitLoss, "TRY")}
+                </span>
+                <span className="text-xs">
+                  ({isPortfolioPositive ? "+" : ""}
+                  {portfolioSummary.totalProfitLossPercent.toFixed(2)}%)
+                </span>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="mt-3 -ml-2">
+                <Link href="/investments">
+                  Detayları Gör
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Top Gainer */}
+          {portfolioSummary.topGainer && (
+            <Card className="border-2 hover:border-emerald-500/30 bg-gradient-to-br from-background to-emerald-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  En Çok Kazandıran
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold truncate">
+                  {portfolioSummary.topGainer.name}
+                </p>
+                <p className="text-emerald-500 font-medium">
+                  +{formatCurrency(portfolioSummary.topGainer.profit, "TRY")}
+                  <span className="text-sm ml-1">
+                    (+{portfolioSummary.topGainer.percent.toFixed(2)}%)
+                  </span>
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Category or Top Loser */}
+          {categoryData.length > 0 ? (
+            <Card className="border-2 hover:border-brand/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <PieChart className="h-4 w-4 text-brand" />
+                  En Çok Harcama
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold">{categoryData[0].category}</p>
+                <p className="text-muted-foreground">
+                  {formatCurrency(categoryData[0].amount, "TRY")}
+                  <span className="text-sm ml-1">
+                    (%{categoryData[0].percentage.toFixed(0)})
+                  </span>
+                </p>
+                <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2">
+                  <Link href="/reports">
+                    Raporları Gör
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : portfolioSummary.topLoser ? (
+            <Card className="border-2 hover:border-red-500/30 bg-gradient-to-br from-background to-red-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-red-500" />
+                  En Çok Kaybettiren
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-bold truncate">
+                  {portfolioSummary.topLoser.name}
+                </p>
+                <p className="text-red-500 font-medium">
+                  {formatCurrency(portfolioSummary.topLoser.loss, "TRY")}
+                  <span className="text-sm ml-1">
+                    ({portfolioSummary.topLoser.percent.toFixed(2)}%)
+                  </span>
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      )}
 
       {/* Recent Expenses & Upcoming Subscriptions */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -276,6 +468,38 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Actions */}
+      <Card className="border-2">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/reports">
+                <PieChart className="h-4 w-4 mr-2" />
+                Raporlar
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/investments">
+                <Gem className="h-4 w-4 mr-2" />
+                Yatırımlar
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/expenses">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Tüm Giderler
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/subscriptions">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Abonelikler
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -5,12 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SubscriptionForm } from "@/components/subscriptions/subscription-form";
+import { EditSubscriptionForm } from "@/components/subscriptions/edit-subscription-form";
+import { CancelSubscriptionModal } from "@/components/subscriptions/cancel-subscription-modal";
 import { UserGuard } from "@/components/user/user-guard";
 import { useUser } from "@/contexts/user-context";
-import { Plus, Calendar, CreditCard } from "lucide-react";
-import { getSubscriptions } from "@/lib/api";
+import { Plus, Calendar, CreditCard, Pencil, Trash2, Ban } from "lucide-react";
+import { getSubscriptions, deleteSubscription } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/lib/types";
+import { SubscriptionCard } from "@/components/subscriptions/subscription-card";
 import {
   formatCurrency,
   formatDate,
@@ -23,6 +26,8 @@ function SubscriptionsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [cancelingSubscription, setCancelingSubscription] = useState<Subscription | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
 
   useEffect(() => {
@@ -49,8 +54,37 @@ function SubscriptionsContent() {
     fetchSubscriptions();
   };
 
+  const handleEdit = (subscription: Subscription) => {
+    setEditingSubscription(subscription);
+  };
+
+  const handleUpdateSuccess = () => {
+    setEditingSubscription(null);
+    fetchSubscriptions();
+  };
+
+  const handleCancel = (subscription: Subscription) => {
+    setCancelingSubscription(subscription);
+  };
+
+  const handleCancelSuccess = () => {
+    setCancelingSubscription(null);
+    fetchSubscriptions();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bu aboneliği silmek istediğinize emin misiniz?")) return;
+
+    try {
+      await deleteSubscription(id);
+      fetchSubscriptions();
+    } catch (err) {
+      alert("Silme işlemi başarısız oldu");
+    }
+  };
+
   const safeSubscriptions = subscriptions || [];
-  
+
   const filteredSubscriptions = safeSubscriptions.filter((sub) => {
     if (filter === "active") return sub?.active === true;
     if (filter === "inactive") return sub?.active === false;
@@ -92,7 +126,29 @@ function SubscriptionsContent() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 relative">
+      {/* Cancel Modal Overlay */}
+      {cancelingSubscription && (
+        <CancelSubscriptionModal
+          subscription={cancelingSubscription}
+          onSuccess={handleCancelSuccess}
+          onCancel={() => setCancelingSubscription(null)}
+        />
+      )}
+
+      {/* Edit Modal Overlay */}
+      {editingSubscription && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg relative z-50">
+            <EditSubscriptionForm
+              subscription={editingSubscription}
+              onSuccess={handleUpdateSuccess}
+              onCancel={() => setEditingSubscription(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -208,87 +264,15 @@ function SubscriptionsContent() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedSubscriptions.map((subscription) => {
-            const isUpcoming =
-              new Date(subscription.next_billing_at).getTime() -
-                new Date().getTime() <
-              7 * 24 * 60 * 60 * 1000; // 7 days
-
-            return (
-              <Card
-                key={subscription.id}
-                className={cn(
-                  "border-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl",
-                  !subscription.active
-                    ? "opacity-60 border-border/50"
-                    : isUpcoming
-                      ? "border-warning/50 hover:border-warning shadow-warning/20"
-                      : "border-border/50 hover:border-brand/30"
-                )}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg font-bold flex-1 truncate">
-                      {subscription.title}
-                    </CardTitle>
-                    <Badge
-                      variant={
-                        subscription.active
-                          ? isUpcoming
-                            ? "warning"
-                            : "success"
-                          : "secondary"
-                      }
-                      className="ml-2 shrink-0 font-semibold"
-                    >
-                      {subscription.active ? "Aktif" : "Pasif"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                    <span className="text-sm font-medium text-muted-foreground">Tutar</span>
-                    <span className="text-xl font-bold bg-gradient-to-r from-brand to-accent bg-clip-text text-transparent">
-                      {formatCurrency(
-                        subscription.amount,
-                        subscription.currency
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Periyot
-                    </span>
-                    <Badge variant="outline" className="font-semibold">
-                      {subscription.billing_period === "monthly"
-                        ? "Aylık"
-                        : "Yıllık"}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t-2 border-border/50">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-brand/10">
-                        <Calendar className="h-4 w-4 text-brand" />
-                      </div>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Sonraki Ödeme
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold">
-                        {formatRelativeTime(subscription.next_billing_at)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {formatDate(subscription.next_billing_at)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {sortedSubscriptions.map((subscription) => (
+            <SubscriptionCard
+              key={subscription.id}
+              subscription={subscription}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onCancel={handleCancel}
+            />
+          ))}
         </div>
       )}
     </div>

@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExpenseForm } from "@/components/expenses/expense-form";
+import { EditExpenseForm } from "@/components/expenses/edit-expense-form";
 import { UserGuard } from "@/components/user/user-guard";
 import { useUser } from "@/contexts/user-context";
-import { Plus, Filter, X } from "lucide-react";
-import { getExpenses, createExpense } from "@/lib/api";
+import { Plus, Filter, X, Pencil, Trash2 } from "lucide-react";
+import { getExpenses, createExpense, deleteExpense } from "@/lib/api";
 import type { Expense, CreateExpenseRequest } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/lib/constants";
@@ -19,6 +20,7 @@ function ExpensesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<
     ExpenseCategory | "all"
   >("all");
@@ -45,6 +47,27 @@ function ExpensesContent() {
   const handleExpenseCreated = () => {
     setShowForm(false);
     fetchExpenses();
+  };
+
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+  };
+
+  const handleUpdateSuccess = () => {
+    setEditingExpense(null);
+    fetchExpenses();
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Bu gideri silmek istediğinize emin misiniz?")) return;
+
+    try {
+      await deleteExpense(id);
+      fetchExpenses();
+    } catch (err) {
+      alert("Silme işlemi başarısız oldu");
+    }
   };
 
   const filteredExpenses =
@@ -80,7 +103,20 @@ function ExpensesContent() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 relative">
+      {/* Edit Modal Overlay */}
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg relative z-50">
+            <EditExpenseForm
+              expense={editingExpense}
+              onSuccess={handleUpdateSuccess}
+              onCancel={() => setEditingExpense(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -160,7 +196,7 @@ function ExpensesContent() {
         <div className="space-y-6">
           {Object.entries(groupedByCategory).map(([category, categoryExpenses]) => {
             if (!categoryExpenses || categoryExpenses.length === 0) return null;
-            
+
             const categoryTotal = categoryExpenses.reduce(
               (sum, exp) => sum + (exp?.amount || 0),
               0
@@ -193,7 +229,7 @@ function ExpensesContent() {
                       .map((expense) => (
                         <div
                           key={expense.id}
-                          className="flex items-center justify-between p-4 rounded-xl border-2 border-border/50 hover:border-brand/30 hover:bg-gradient-to-r hover:from-brand/5 hover:to-accent/5 transition-all duration-200 group cursor-pointer"
+                          className="flex items-center justify-between p-4 rounded-xl border-2 border-border/50 hover:border-brand/30 hover:bg-gradient-to-r hover:from-brand/5 hover:to-accent/5 transition-all duration-200 group"
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate group-hover:text-brand transition-colors">
@@ -203,10 +239,28 @@ function ExpensesContent() {
                               {formatDate(expense.created_at)}
                             </p>
                           </div>
-                          <div className="ml-4 text-right">
+                          <div className="ml-4 text-right flex items-center gap-4">
                             <p className="text-sm font-bold group-hover:text-brand transition-colors">
                               {formatCurrency(expense.amount, expense.currency)}
                             </p>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleEdit(expense)}
+                              >
+                                <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 dark:hover:bg-red-900/30"
+                                onClick={(e) => handleDelete(expense.id, e)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
