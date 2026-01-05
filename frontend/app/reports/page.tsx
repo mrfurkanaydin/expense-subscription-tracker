@@ -17,8 +17,8 @@ import {
   useBudget,
 } from "@/components/reports/budget-manager";
 import { useUser } from "@/contexts/user-context";
-import { getExpenses, getSubscriptions } from "@/lib/api";
-import type { Expense, Subscription, DateRange } from "@/lib/types";
+import { getExpenses, getSubscriptions, getDebtSummary } from "@/lib/api";
+import type { Expense, Subscription, DateRange, DebtSummary } from "@/lib/types";
 import { DATE_RANGE_OPTIONS } from "@/lib/constants";
 import {
   filterByDateRange,
@@ -36,6 +36,7 @@ import {
   Target,
   Settings,
 } from "lucide-react";
+import { AlertCircle, TrendingDown } from "lucide-react";
 
 function ReportsContent() {
   const { user } = useUser();
@@ -44,6 +45,7 @@ function ReportsContent() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debtSummary, setDebtSummary] = useState<DebtSummary | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("this-month");
   const [showBudgetForm, setShowBudgetForm] = useState(false);
 
@@ -58,14 +60,16 @@ function ReportsContent() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [expensesData, subscriptionsData] = await Promise.all([
+        const [expensesData, subscriptionsData, debtSummaryData] = await Promise.all([
           getExpenses(user!.id),
           getSubscriptions(user!.id),
+          getDebtSummary(user!.id).catch(() => null),
         ]);
         setExpenses(Array.isArray(expensesData) ? expensesData : []);
         setSubscriptions(
           Array.isArray(subscriptionsData) ? subscriptionsData : []
         );
+        setDebtSummary(debtSummaryData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Bir hata oluştu");
       } finally {
@@ -237,6 +241,66 @@ function ReportsContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Debt Summary Section */}
+      {debtSummary && debtSummary.total_debt > 0 && (
+        <Card className="border-2 hover:border-red-500/30 bg-gradient-to-r from-red-500/5 to-orange-500/5">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Borç Durumu
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Taksitli borçlarınızın özeti
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                <p className="text-xs text-muted-foreground font-medium">Toplam Borç</p>
+                <p className="text-xl font-bold text-red-500 mt-1">
+                  {formatCurrency(debtSummary.total_debt, "TRY")}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xs text-muted-foreground font-medium">Aylık Taksit</p>
+                <p className="text-xl font-bold text-amber-500 mt-1">
+                  {formatCurrency(debtSummary.total_monthly_payment, "TRY")}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-xs text-muted-foreground font-medium">Aktif Borç</p>
+                <p className="text-xl font-bold text-blue-500 mt-1">
+                  {debtSummary.active_debts_count} adet
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <p className="text-xs text-muted-foreground font-medium">İlerleme</p>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span>{debtSummary.paid_installments} / {debtSummary.total_installments} taksit</span>
+                    <span className="font-medium text-emerald-500">
+                      %{debtSummary.total_installments > 0
+                        ? Math.round((debtSummary.paid_installments / debtSummary.total_installments) * 100)
+                        : 0}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full transition-all"
+                      style={{
+                        width: `${debtSummary.total_installments > 0
+                          ? (debtSummary.paid_installments / debtSummary.total_installments) * 100
+                          : 0}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Grid */}
       <div className="grid gap-6 lg:grid-cols-2">

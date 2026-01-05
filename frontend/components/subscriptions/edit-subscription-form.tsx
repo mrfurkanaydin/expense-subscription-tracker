@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CURRENCIES, BILLING_PERIODS } from "@/lib/constants";
-import { updateSubscription } from "@/lib/api";
-import type { Subscription, UpdateSubscriptionRequest } from "@/lib/types";
+import { updateSubscription, getCreditCards } from "@/lib/api";
+import type { Subscription, UpdateSubscriptionRequest, CreditCard } from "@/lib/types";
 
 const subscriptionSchema = z.object({
     title: z.string().min(1, "Başlık gereklidir"),
@@ -19,6 +19,7 @@ const subscriptionSchema = z.object({
     start_date: z.string().optional(),
     end_date: z.string().optional(),
     active: z.boolean().optional(),
+    credit_card_id: z.string().optional(),
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionSchema>;
@@ -35,6 +36,14 @@ export function EditSubscriptionForm({
     onCancel,
 }: EditSubscriptionFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+
+    useEffect(() => {
+        getCreditCards(subscription.user_id).then(cards => {
+            if (Array.isArray(cards)) setCreditCards(cards);
+        }).catch(() => { });
+    }, [subscription.user_id]);
+
     const {
         register,
         handleSubmit,
@@ -50,6 +59,7 @@ export function EditSubscriptionForm({
             start_date: subscription.start_date ? new Date(subscription.start_date).toISOString().split("T")[0] : undefined,
             end_date: subscription.end_date ? new Date(subscription.end_date).toISOString().split("T")[0] : undefined,
             active: subscription.active,
+            credit_card_id: subscription.credit_card_id || "",
         },
     });
 
@@ -59,10 +69,15 @@ export function EditSubscriptionForm({
             const nextBillingDate = new Date(data.next_billing_at);
             const request: UpdateSubscriptionRequest = {
                 id: subscription.id,
-                ...data,
+                title: data.title,
+                amount: data.amount,
+                currency: data.currency,
+                billing_period: data.billing_period,
                 next_billing_at: nextBillingDate.toISOString(),
                 start_date: data.start_date ? new Date(data.start_date).toISOString() : undefined,
-                end_date: data.end_date ? new Date(data.end_date).toISOString() : "", // Empty string to clear end_date if supported by handler
+                end_date: data.end_date ? new Date(data.end_date).toISOString() : "",
+                active: data.active,
+                credit_card_id: data.credit_card_id || undefined,
             };
             await updateSubscription(request);
             onSuccess?.();
@@ -226,6 +241,27 @@ export function EditSubscriptionForm({
                         </div>
                     </div>
 
+                    <div>
+                        <label
+                            htmlFor="credit_card_id"
+                            className="block text-sm font-medium mb-1.5"
+                        >
+                            Kredi Kartı (Opsiyonel)
+                        </label>
+                        <select
+                            id="credit_card_id"
+                            {...register("credit_card_id")}
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                            <option value="">Kart seçilmedi</option>
+                            {creditCards.map((card) => (
+                                <option key={card.id} value={card.id}>
+                                    {card.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="flex items-center space-x-2">
                         <input
                             type="checkbox"
@@ -253,3 +289,4 @@ export function EditSubscriptionForm({
         </Card>
     );
 }
+

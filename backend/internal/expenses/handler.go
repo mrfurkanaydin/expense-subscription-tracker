@@ -17,11 +17,13 @@ func NewHandler(repo Repository) *Handler {
 }
 
 type createExpenseRequest struct {
-	UserID   string  `json:"user_id"`
-	Title    string  `json:"title"`
-	Amount   float64 `json:"amount"`
-	Currency string  `json:"currency"`
-	Category string  `json:"category"`
+	UserID        string  `json:"user_id"`
+	Title         string  `json:"title"`
+	Amount        float64 `json:"amount"`
+	Currency      string  `json:"currency"`
+	Category      string  `json:"category"`
+	CreditCardID  *string `json:"credit_card_id,omitempty"`
+	PaymentMethod string  `json:"payment_method"`
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -47,12 +49,27 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var creditCardID *uuid.UUID
+	if req.CreditCardID != nil && *req.CreditCardID != "" {
+		parsedID, err := uuid.Parse(*req.CreditCardID)
+		if err == nil {
+			creditCardID = &parsedID
+		}
+	}
+
+	paymentMethod := req.PaymentMethod
+	if paymentMethod == "" {
+		paymentMethod = "cash"
+	}
+
 	exp := &Expense{
-		UserID:   userUUID,
-		Title:    req.Title,
-		Amount:   req.Amount,
-		Currency: req.Currency,
-		Category: req.Category,
+		UserID:        userUUID,
+		Title:         req.Title,
+		Amount:        req.Amount,
+		Currency:      req.Currency,
+		Category:      req.Category,
+		CreditCardID:  creditCardID,
+		PaymentMethod: paymentMethod,
 	}
 
 	createdExp, err := h.repo.Create(context.Background(), exp)
@@ -123,6 +140,19 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Category != "" {
 		existing.Category = req.Category
+	}
+	if req.PaymentMethod != "" {
+		existing.PaymentMethod = req.PaymentMethod
+	}
+	if req.CreditCardID != nil {
+		if *req.CreditCardID == "" {
+			existing.CreditCardID = nil
+		} else {
+			parsedID, err := uuid.Parse(*req.CreditCardID)
+			if err == nil {
+				existing.CreditCardID = &parsedID
+			}
+		}
 	}
 
 	updated, err := h.repo.Update(r.Context(), id, existing)

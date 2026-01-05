@@ -6,6 +6,17 @@ import type {
   CreateSubscriptionRequest,
   UpdateExpenseRequest,
   UpdateSubscriptionRequest,
+  CreditCard,
+  Debt,
+  DebtSummary,
+  CreateCreditCardRequest,
+  UpdateCreditCardRequest,
+  CreateDebtRequest,
+  UpdateDebtRequest,
+  Income,
+  IncomeSummary,
+  CreateIncomeRequest,
+  UpdateIncomeRequest,
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -109,4 +120,97 @@ export async function deleteSubscription(id: string): Promise<void> {
 // Health check
 export async function healthCheck(): Promise<{ status: string }> {
   return fetchAPI<{ status: string }>("/health");
+}
+
+// Credit Cards API
+export async function getCreditCards(userId: string): Promise<CreditCard[]> {
+  return fetchAPI<CreditCard[]>(`/credit-cards?user_id=${userId}`);
+}
+
+export async function createCreditCard(
+  data: CreateCreditCardRequest
+): Promise<CreditCard> {
+  return fetchAPI<CreditCard>("/credit-cards", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateCreditCard(
+  data: UpdateCreditCardRequest
+): Promise<CreditCard> {
+  return fetchAPI<CreditCard>(`/credit-cards?id=${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCreditCard(id: string): Promise<void> {
+  return fetchAPI<void>(`/credit-cards?id=${id}`, {
+    method: "DELETE",
+  });
+}
+
+// Debts API
+export async function getDebts(userId: string): Promise<Debt[]> {
+  return fetchAPI<Debt[]>(`/debts?user_id=${userId}`);
+}
+
+export async function getDebtSummary(userId: string): Promise<DebtSummary> {
+  return fetchAPI<DebtSummary>(`/debts/summary?user_id=${userId}`);
+}
+
+export async function createDebt(data: CreateDebtRequest): Promise<Debt> {
+  return fetchAPI<Debt>("/debts", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateDebt(data: UpdateDebtRequest): Promise<Debt> {
+  return fetchAPI<Debt>(`/debts?id=${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDebt(id: string): Promise<void> {
+  return fetchAPI<void>(`/debts?id=${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function payInstallment(id: string): Promise<Debt> {
+  return fetchAPI<Debt>(`/debts/pay?id=${id}`, {
+    method: "POST",
+  });
+}
+
+// Incomes API
+export async function getIncomes(userId: string): Promise<Income[]> {
+  return fetchAPI<Income[]>(`/incomes?user_id=${userId}`);
+}
+
+export async function getIncomeSummary(userId: string): Promise<IncomeSummary> {
+  return fetchAPI<IncomeSummary>(`/incomes/summary?user_id=${userId}`);
+}
+
+export async function createIncome(data: CreateIncomeRequest): Promise<Income> {
+  return fetchAPI<Income>("/incomes", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateIncome(data: UpdateIncomeRequest): Promise<Income> {
+  return fetchAPI<Income>(`/incomes?id=${data.id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteIncome(id: string): Promise<void> {
+  return fetchAPI<void>(`/incomes?id=${id}`, {
+    method: "DELETE",
+  });
 }

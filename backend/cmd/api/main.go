@@ -6,7 +6,9 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/db"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/debts"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/expenses"
+	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/incomes"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/investments"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/market"
 	"github.com/mrfurkanaydin/expense-subscription-tracker/backend/internal/middleware"
@@ -99,6 +101,84 @@ func main() {
 		case http.MethodDelete:
 			invHandler.Delete(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// Debts
+	cardRepo := debts.NewPostgresCreditCardRepository()
+	debtRepo := debts.NewPostgresDebtRepository()
+	debtHandler := debts.NewHandler(cardRepo, debtRepo)
+
+	mux.HandleFunc("/credit-cards", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			debtHandler.CreateCreditCard(w, r)
+		case http.MethodGet:
+			debtHandler.GetCreditCardsByUserID(w, r)
+		case http.MethodPut:
+			debtHandler.UpdateCreditCard(w, r)
+		case http.MethodDelete:
+			debtHandler.DeleteCreditCard(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/debts", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			debtHandler.CreateDebt(w, r)
+		case http.MethodGet:
+			debtHandler.GetDebtsByUserID(w, r)
+		case http.MethodPut:
+			debtHandler.UpdateDebt(w, r)
+		case http.MethodDelete:
+			debtHandler.DeleteDebt(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/debts/pay", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			debtHandler.PayInstallment(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/debts/summary", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			debtHandler.GetDebtSummary(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	// Incomes
+	incomeRepo := incomes.NewPostgresRepository()
+	incomeHandler := incomes.NewHandler(incomeRepo)
+
+	mux.HandleFunc("/incomes", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			incomeHandler.Create(w, r)
+		case http.MethodGet:
+			incomeHandler.GetByUserID(w, r)
+		case http.MethodPut:
+			incomeHandler.Update(w, r)
+		case http.MethodDelete:
+			incomeHandler.Delete(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+
+	mux.HandleFunc("/incomes/summary", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			incomeHandler.GetSummary(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))

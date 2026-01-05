@@ -11,19 +11,21 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  CreditCard,
+  CreditCard as CreditCardIcon,
   Calendar,
   Plus,
   ArrowRight,
   PieChart,
   Gem,
   Target,
+  Banknote,
+  AlertCircle,
 } from "lucide-react";
-import { getExpenses, getSubscriptions } from "@/lib/api";
+import { getExpenses, getSubscriptions, getDebtSummary, getDebts, getIncomeSummary } from "@/lib/api";
 import { getInvestments } from "@/lib/api/investments";
 import { getMarketPricesAsync, convertToTRY } from "@/lib/api/market-data";
 import { useUser } from "@/contexts/user-context";
-import type { Expense, Subscription } from "@/lib/types";
+import type { Expense, Subscription, DebtSummary, Debt, IncomeSummary } from "@/lib/types";
 import type { Investment, MarketPrice } from "@/lib/types/investments";
 import {
   formatDateShort,
@@ -46,6 +48,9 @@ function DashboardContent() {
   const [marketPrices, setMarketPrices] = useState<Map<string, MarketPrice>>(
     new Map()
   );
+  const [debtSummary, setDebtSummary] = useState<DebtSummary | null>(null);
+  const [upcomingDebts, setUpcomingDebts] = useState<Debt[]>([]);
+  const [incomeSummary, setIncomeSummary] = useState<IncomeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,17 +65,23 @@ function DashboardContent() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [expensesData, subscriptionsData, investmentsData] =
+        const [expensesData, subscriptionsData, investmentsData, debtSummaryData, debtsData, incomeSummaryData] =
           await Promise.all([
             getExpenses(userId),
             getSubscriptions(userId),
             getInvestments(userId).catch(() => []),
+            getDebtSummary(userId).catch(() => null),
+            getDebts(userId).catch(() => []),
+            getIncomeSummary(userId).catch(() => null),
           ]);
         setExpenses(Array.isArray(expensesData) ? expensesData : []);
         setSubscriptions(
           Array.isArray(subscriptionsData) ? subscriptionsData : []
         );
         setInvestments(Array.isArray(investmentsData) ? investmentsData : []);
+        setDebtSummary(debtSummaryData);
+        setUpcomingDebts((Array.isArray(debtsData) ? debtsData : []).filter((d: Debt) => d.status === 'active').slice(0, 3));
+        setIncomeSummary(incomeSummaryData);
 
         // Fetch market prices for investments
         if (investmentsData.length > 0) {
@@ -228,7 +239,7 @@ function DashboardContent() {
           title="Aylık Abonelik"
           value={formatCurrency(monthlyRecurring, "TRY")}
           description={`${activeSubscriptions} aktif`}
-          icon={CreditCard}
+          icon={CreditCardIcon}
         />
         <StatsCard
           title="Yıllık Tekrarlayan"
@@ -236,6 +247,96 @@ function DashboardContent() {
           icon={Wallet}
         />
       </div>
+
+      {/* Debt & Income Summary Row */}
+      {(debtSummary || incomeSummary) && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* This Month Income */}
+          <Card className="border-2 hover:border-emerald-500/30 bg-gradient-to-br from-background to-emerald-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-emerald-500" />
+                Bu Ay Gelir
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-emerald-500">
+                +{formatCurrency(incomeSummary?.this_month_income || 0, "TRY")}
+              </p>
+              {incomeSummary?.monthly_recurring ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(incomeSummary.monthly_recurring, "TRY")} düzenli gelir
+                </p>
+              ) : null}
+              <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2">
+                <Link href="/incomes">
+                  Detayları Gör
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Total Debt */}
+          <Card className="border-2 hover:border-red-500/30 bg-gradient-to-br from-background to-red-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                Toplam Borç
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-red-500">
+                {formatCurrency(debtSummary?.total_debt || 0, "TRY")}
+              </p>
+              {debtSummary?.total_monthly_payment ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(debtSummary.total_monthly_payment, "TRY")} aylık taksit
+                </p>
+              ) : null}
+              <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2">
+                <Link href="/debts">
+                  Detayları Gör
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Net Status */}
+          {incomeSummary && debtSummary && (
+            <Card className={cn(
+              "border-2",
+              (incomeSummary.this_month_income - (thisMonthTotal + (debtSummary?.total_monthly_payment || 0))) >= 0
+                ? "hover:border-emerald-500/30 bg-gradient-to-br from-background to-emerald-500/5"
+                : "hover:border-red-500/30 bg-gradient-to-br from-background to-red-500/5"
+            )}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Target className="h-4 w-4 text-brand" />
+                  Bu Ay Net Durum
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const net = incomeSummary.this_month_income - (thisMonthTotal + (debtSummary?.total_monthly_payment || 0));
+                  const isPositive = net >= 0;
+                  return (
+                    <>
+                      <p className={cn("text-2xl font-bold", isPositive ? "text-emerald-500" : "text-red-500")}>
+                        {isPositive ? "+" : ""}{formatCurrency(net, "TRY")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Gelir - (Gider + Taksit)
+                      </p>
+                    </>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Portfolio + Budget Row */}
       {investments.length > 0 && (
@@ -512,7 +613,7 @@ function DashboardContent() {
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/subscriptions">
-                <CreditCard className="h-4 w-4 mr-2" />
+                <CreditCardIcon className="h-4 w-4 mr-2" />
                 Abonelikler
               </Link>
             </Button>

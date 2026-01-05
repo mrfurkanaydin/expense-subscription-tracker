@@ -11,6 +11,8 @@ import { Wallet, LogOut, User, Eye, EyeOff } from "lucide-react";
 const navigation = [
   { name: "Dashboard", href: "/" },
   { name: "Giderler", href: "/expenses" },
+  { name: "Gelirler", href: "/incomes" },
+  { name: "Borçlar", href: "/debts" },
   { name: "Abonelikler", href: "/subscriptions" },
   { name: "Yatırımlar", href: "/investments" },
   { name: "Raporlar", href: "/reports" },

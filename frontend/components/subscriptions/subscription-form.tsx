@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CURRENCIES, BILLING_PERIODS } from "@/lib/constants";
-import { createSubscription } from "@/lib/api";
-import type { CreateSubscriptionRequest } from "@/lib/types";
+import { createSubscription, getCreditCards } from "@/lib/api";
+import type { CreateSubscriptionRequest, CreditCard } from "@/lib/types";
 
 const subscriptionSchema = z.object({
   title: z.string().min(1, "Başlık gereklidir"),
@@ -17,6 +17,7 @@ const subscriptionSchema = z.object({
   billing_period: z.enum(["monthly", "yearly"]),
   next_billing_at: z.string().min(1, "Yenileme tarihi gereklidir"),
   start_date: z.string().optional(),
+  credit_card_id: z.string().optional(),
 });
 
 type SubscriptionFormData = z.infer<typeof subscriptionSchema>;
@@ -33,6 +34,14 @@ export function SubscriptionForm({
   onCancel,
 }: SubscriptionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+
+  useEffect(() => {
+    getCreditCards(userId).then(cards => {
+      if (Array.isArray(cards)) setCreditCards(cards);
+    }).catch(() => { });
+  }, [userId]);
+
   const {
     register,
     handleSubmit,
@@ -57,9 +66,13 @@ export function SubscriptionForm({
       const nextBillingDate = new Date(data.next_billing_at);
       const request: CreateSubscriptionRequest = {
         user_id: userId,
-        ...data,
+        title: data.title,
+        amount: data.amount,
+        currency: data.currency,
+        billing_period: data.billing_period,
         next_billing_at: nextBillingDate.toISOString(),
         start_date: data.start_date ? new Date(data.start_date).toISOString() : undefined,
+        credit_card_id: data.credit_card_id || undefined,
       };
       await createSubscription(request);
       reset();
@@ -183,24 +196,47 @@ export function SubscriptionForm({
             </div>
           </div>
 
-          <div>
-            <label
-              htmlFor="next_billing_at"
-              className="block text-sm font-medium mb-1.5"
-            >
-              Sonraki Ödeme Tarihi
-            </label>
-            <input
-              id="next_billing_at"
-              type="date"
-              {...register("next_billing_at")}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            {errors.next_billing_at && (
-              <p className="text-xs text-red-600 mt-1">
-                {errors.next_billing_at.message}
-              </p>
-            )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="next_billing_at"
+                className="block text-sm font-medium mb-1.5"
+              >
+                Sonraki Ödeme Tarihi
+              </label>
+              <input
+                id="next_billing_at"
+                type="date"
+                {...register("next_billing_at")}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {errors.next_billing_at && (
+                <p className="text-xs text-red-600 mt-1">
+                  {errors.next_billing_at.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="credit_card_id"
+                className="block text-sm font-medium mb-1.5"
+              >
+                Kredi Kartı (Opsiyonel)
+              </label>
+              <select
+                id="credit_card_id"
+                {...register("credit_card_id")}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Kart seçilmedi</option>
+                {creditCards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {card.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex gap-2 pt-2">
@@ -218,4 +254,5 @@ export function SubscriptionForm({
     </Card>
   );
 }
+
 

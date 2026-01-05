@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EXPENSE_CATEGORIES, CURRENCIES } from "@/lib/constants";
-import { updateExpense } from "@/lib/api";
-import type { Expense, UpdateExpenseRequest } from "@/lib/types";
+import { updateExpense, getCreditCards } from "@/lib/api";
+import type { Expense, UpdateExpenseRequest, CreditCard } from "@/lib/types";
+import { Banknote, CreditCard as CreditCardIcon, Building2 } from "lucide-react";
 
 const expenseSchema = z.object({
     title: z.string().min(1, "Başlık gereklidir"),
     amount: z.number().positive("Tutar pozitif olmalıdır"),
     currency: z.enum(["TRY", "USD", "EUR", "GBP"]),
     category: z.string().min(1, "Kategori seçilmelidir"),
+    payment_method: z.enum(["cash", "debit_card", "credit_card"]),
+    credit_card_id: z.string().optional(),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -31,26 +34,44 @@ export function EditExpenseForm({
     onCancel,
 }: EditExpenseFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+
+    useEffect(() => {
+        getCreditCards(expense.user_id).then(cards => {
+            if (Array.isArray(cards)) setCreditCards(cards);
+        }).catch(() => { });
+    }, [expense.user_id]);
+
     const {
         register,
         handleSubmit,
+        watch,
         formState: { errors },
     } = useForm<ExpenseFormData>({
         resolver: zodResolver(expenseSchema),
         defaultValues: {
             title: expense.title,
             amount: expense.amount,
-            currency: expense.currency as any,
+            currency: expense.currency as "TRY" | "USD" | "EUR" | "GBP",
             category: expense.category,
+            payment_method: expense.payment_method || "cash",
+            credit_card_id: expense.credit_card_id || "",
         },
     });
+
+    const paymentMethod = watch("payment_method");
 
     const onSubmit = async (data: ExpenseFormData) => {
         try {
             setIsSubmitting(true);
             const request: UpdateExpenseRequest = {
                 id: expense.id,
-                ...data,
+                title: data.title,
+                amount: data.amount,
+                currency: data.currency,
+                category: data.category,
+                payment_method: data.payment_method,
+                credit_card_id: data.payment_method === "credit_card" ? data.credit_card_id : undefined,
             };
             await updateExpense(request);
             onSuccess?.();
@@ -70,10 +91,7 @@ export function EditExpenseForm({
             <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div>
-                        <label
-                            htmlFor="title"
-                            className="block text-sm font-medium mb-1.5"
-                        >
+                        <label htmlFor="title" className="block text-sm font-medium mb-1.5">
                             Başlık
                         </label>
                         <input
@@ -89,10 +107,7 @@ export function EditExpenseForm({
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label
-                                htmlFor="amount"
-                                className="block text-sm font-medium mb-1.5"
-                            >
+                            <label htmlFor="amount" className="block text-sm font-medium mb-1.5">
                                 Tutar
                             </label>
                             <input
@@ -104,17 +119,12 @@ export function EditExpenseForm({
                                 placeholder="0.00"
                             />
                             {errors.amount && (
-                                <p className="text-xs text-red-600 mt-1">
-                                    {errors.amount.message}
-                                </p>
+                                <p className="text-xs text-red-600 mt-1">{errors.amount.message}</p>
                             )}
                         </div>
 
                         <div>
-                            <label
-                                htmlFor="currency"
-                                className="block text-sm font-medium mb-1.5"
-                            >
+                            <label htmlFor="currency" className="block text-sm font-medium mb-1.5">
                                 Para Birimi
                             </label>
                             <select
@@ -123,19 +133,14 @@ export function EditExpenseForm({
                                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             >
                                 {CURRENCIES.map((currency) => (
-                                    <option key={currency} value={currency}>
-                                        {currency}
-                                    </option>
+                                    <option key={currency} value={currency}>{currency}</option>
                                 ))}
                             </select>
                         </div>
                     </div>
 
                     <div>
-                        <label
-                            htmlFor="category"
-                            className="block text-sm font-medium mb-1.5"
-                        >
+                        <label htmlFor="category" className="block text-sm font-medium mb-1.5">
                             Kategori
                         </label>
                         <select
@@ -144,12 +149,51 @@ export function EditExpenseForm({
                             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                             {EXPENSE_CATEGORIES.map((category) => (
-                                <option key={category} value={category}>
-                                    {category}
-                                </option>
+                                <option key={category} value={category}>{category}</option>
                             ))}
                         </select>
                     </div>
+
+                    {/* Payment Method */}
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Ödeme Yöntemi</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <label className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${paymentMethod === "cash" ? "border-green-500 bg-green-500/10 text-green-600" : "border-border hover:border-green-500/50"}`}>
+                                <input type="radio" value="cash" {...register("payment_method")} className="sr-only" />
+                                <Banknote className="h-4 w-4" />
+                                <span className="text-xs font-medium">Nakit</span>
+                            </label>
+                            <label className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${paymentMethod === "debit_card" ? "border-blue-500 bg-blue-500/10 text-blue-600" : "border-border hover:border-blue-500/50"}`}>
+                                <input type="radio" value="debit_card" {...register("payment_method")} className="sr-only" />
+                                <Building2 className="h-4 w-4" />
+                                <span className="text-xs font-medium">Banka</span>
+                            </label>
+                            <label className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all ${paymentMethod === "credit_card" ? "border-purple-500 bg-purple-500/10 text-purple-600" : "border-border hover:border-purple-500/50"}`}>
+                                <input type="radio" value="credit_card" {...register("payment_method")} className="sr-only" />
+                                <CreditCardIcon className="h-4 w-4" />
+                                <span className="text-xs font-medium">Kredi</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Credit Card Selection */}
+                    {paymentMethod === "credit_card" && creditCards.length > 0 && (
+                        <div>
+                            <label htmlFor="credit_card_id" className="block text-sm font-medium mb-1.5">
+                                Kredi Kartı
+                            </label>
+                            <select
+                                id="credit_card_id"
+                                {...register("credit_card_id")}
+                                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                                <option value="">Kart seçin</option>
+                                {creditCards.map((card) => (
+                                    <option key={card.id} value={card.id}>{card.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="flex gap-2 pt-2">
                         <Button type="submit" disabled={isSubmitting} className="flex-1">

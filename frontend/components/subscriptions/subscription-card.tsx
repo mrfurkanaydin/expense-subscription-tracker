@@ -158,6 +158,19 @@ export function SubscriptionCard({
             </div>
           </div>
 
+          {/* Credit Card Info */}
+          {subscription.credit_card_name && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <CreditCard className="h-4 w-4" />
+                <span>Kredi Kartı</span>
+              </div>
+              <div className="font-semibold text-brand">
+                {subscription.credit_card_name}
+              </div>
+            </div>
+          )}
+
           {/* Relative Time Text */}
           <div className="text-right">
             <p

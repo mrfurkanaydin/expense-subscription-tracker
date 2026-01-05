@@ -240,9 +240,17 @@ function ExpensesContent() {
                             </p>
                           </div>
                           <div className="ml-4 text-right flex items-center gap-4">
-                            <p className="text-sm font-bold group-hover:text-brand transition-colors">
-                              {formatCurrency(expense.amount, expense.currency)}
-                            </p>
+                            <div className="text-right">
+                              <p className="text-sm font-bold group-hover:text-brand transition-colors">
+                                {formatCurrency(expense.amount, expense.currency)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {expense.payment_method === "cash" && "💵 Nakit"}
+                                {expense.payment_method === "debit_card" && "🏦 Banka"}
+                                {expense.payment_method === "credit_card" && `💳 ${expense.credit_card_name || "Kredi"}`}
+                                {!expense.payment_method && (expense.credit_card_name ? `💳 ${expense.credit_card_name}` : "💵 Nakit")}
+                              </p>
+                            </div>
                             <div className="flex gap-2">
                               <Button
                                 variant="ghost"
