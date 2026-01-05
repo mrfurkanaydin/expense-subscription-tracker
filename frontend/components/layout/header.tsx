@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/user-context";
+import { usePrivacy } from "@/contexts/privacy-context";
 import { Button } from "@/components/ui/button";
-import { Wallet, LogOut, User } from "lucide-react";
+import { Wallet, LogOut, User, Eye, EyeOff } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/" },
@@ -18,6 +19,7 @@ const navigation = [
 export function Header() {
   const pathname = usePathname();
   const { user, setUser } = useUser();
+  const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
 
   const handleLogout = () => {
     if (confirm("Çıkış yapmak istediğinize emin misiniz?")) {
@@ -61,6 +63,27 @@ export function Header() {
             })}
           </nav>
 
+          {/* Privacy Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={togglePrivacyMode}
+            className={cn(
+              "h-9 w-9 rounded-lg transition-all duration-200",
+              isPrivacyMode
+                ? "text-brand bg-brand/10 hover:bg-brand/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+            aria-label={isPrivacyMode ? "Tutarları göster" : "Tutarları gizle"}
+            title={isPrivacyMode ? "Tutarları göster" : "Tutarları gizle"}
+          >
+            {isPrivacyMode ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+
           {user && (
             <div className="flex items-center gap-2 border-l border-border pl-4">
               <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
@@ -83,4 +106,3 @@ export function Header() {
     </header>
   );
 }
-

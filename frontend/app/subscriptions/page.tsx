@@ -14,20 +14,20 @@ import { getSubscriptions, deleteSubscription } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/lib/types";
 import { SubscriptionCard } from "@/components/subscriptions/subscription-card";
-import {
-  formatCurrency,
-  formatDate,
-  formatRelativeTime,
-} from "@/lib/utils/format";
+import { formatDate, formatRelativeTime } from "@/lib/utils/format";
+import { useFormatCurrency } from "@/lib/hooks/use-format-currency";
 
 function SubscriptionsContent() {
   const { user } = useUser();
+  const { formatCurrency } = useFormatCurrency();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
-  const [cancelingSubscription, setCancelingSubscription] = useState<Subscription | null>(null);
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
+  const [cancelingSubscription, setCancelingSubscription] =
+    useState<Subscription | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
 
   useEffect(() => {
@@ -101,7 +101,9 @@ function SubscriptionsContent() {
     );
   });
 
-  const activeSubscriptions = safeSubscriptions.filter((sub) => sub?.active === true);
+  const activeSubscriptions = safeSubscriptions.filter(
+    (sub) => sub?.active === true
+  );
   const totalMonthly = activeSubscriptions
     .filter((sub) => sub?.billing_period === "monthly")
     .reduce((sum, sub) => sum + (sub?.amount || 0), 0);
@@ -286,4 +288,3 @@ export default function SubscriptionsPage() {
     </UserGuard>
   );
 }
-

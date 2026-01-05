@@ -26,7 +26,6 @@ import { useUser } from "@/contexts/user-context";
 import type { Expense, Subscription } from "@/lib/types";
 import type { Investment, MarketPrice } from "@/lib/types/investments";
 import {
-  formatCurrency,
   formatDateShort,
   formatRelativeTime,
   calculateTotalExpenses,
@@ -35,14 +34,18 @@ import {
   getUpcomingSubscriptions,
 } from "@/lib/utils/format";
 import { filterByDateRange, groupByCategory } from "@/lib/utils/analytics";
+import { useFormatCurrency } from "@/lib/hooks/use-format-currency";
 import { cn } from "@/lib/utils";
 
 function DashboardContent() {
   const { user } = useUser();
+  const { formatCurrency } = useFormatCurrency();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [marketPrices, setMarketPrices] = useState<Map<string, MarketPrice>>(new Map());
+  const [marketPrices, setMarketPrices] = useState<Map<string, MarketPrice>>(
+    new Map()
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,13 +60,16 @@ function DashboardContent() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [expensesData, subscriptionsData, investmentsData] = await Promise.all([
-          getExpenses(userId),
-          getSubscriptions(userId),
-          getInvestments(userId).catch(() => []),
-        ]);
+        const [expensesData, subscriptionsData, investmentsData] =
+          await Promise.all([
+            getExpenses(userId),
+            getSubscriptions(userId),
+            getInvestments(userId).catch(() => []),
+          ]);
         setExpenses(Array.isArray(expensesData) ? expensesData : []);
-        setSubscriptions(Array.isArray(subscriptionsData) ? subscriptionsData : []);
+        setSubscriptions(
+          Array.isArray(subscriptionsData) ? subscriptionsData : []
+        );
         setInvestments(Array.isArray(investmentsData) ? investmentsData : []);
 
         // Fetch market prices for investments
@@ -86,14 +92,21 @@ function DashboardContent() {
   const portfolioSummary = useMemo(() => {
     let totalValue = 0;
     let totalCost = 0;
-    let topGainer: { name: string; profit: number; percent: number } | null = null;
+    let topGainer: { name: string; profit: number; percent: number } | null =
+      null;
     let topLoser: { name: string; loss: number; percent: number } | null = null;
 
     for (const inv of investments) {
       const marketPrice = marketPrices.get(inv.symbol);
       const currentPrice = marketPrice?.price || inv.purchase_price;
-      const currentPriceTRY = convertToTRY(currentPrice, marketPrice?.currency || inv.purchase_currency);
-      const purchasePriceTRY = convertToTRY(inv.purchase_price, inv.purchase_currency);
+      const currentPriceTRY = convertToTRY(
+        currentPrice,
+        marketPrice?.currency || inv.purchase_currency
+      );
+      const purchasePriceTRY = convertToTRY(
+        inv.purchase_price,
+        inv.purchase_currency
+      );
 
       const value = inv.quantity * currentPriceTRY;
       const cost = inv.quantity * purchasePriceTRY;
@@ -115,7 +128,8 @@ function DashboardContent() {
       totalValue,
       totalCost,
       totalProfitLoss: totalValue - totalCost,
-      totalProfitLossPercent: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
+      totalProfitLossPercent:
+        totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
       topGainer,
       topLoser,
     };
@@ -307,7 +321,12 @@ function DashboardContent() {
                     (%{categoryData[0].percentage.toFixed(0)})
                   </span>
                 </p>
-                <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 -ml-2"
+                >
                   <Link href="/reports">
                     Raporları Gör
                     <ArrowRight className="h-4 w-4 ml-1" />

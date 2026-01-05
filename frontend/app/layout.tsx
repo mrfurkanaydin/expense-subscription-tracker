@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { UserProvider } from "@/contexts/user-context";
+import { PrivacyProvider } from "@/contexts/privacy-context";
 import { Header } from "@/components/layout/header";
 import "./globals.css";
 
@@ -37,10 +38,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
       >
         <UserProvider>
-          <Header />
-          <main className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
-            {children}
-          </main>
+          <PrivacyProvider>
+            <Header />
+            <main className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
+              {children}
+            </main>
+          </PrivacyProvider>
         </UserProvider>
       </body>
     </html>
