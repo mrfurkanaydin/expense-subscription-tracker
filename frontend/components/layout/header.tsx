@@ -69,7 +69,7 @@ export function Header() {
             size="icon"
             onClick={togglePrivacyMode}
             className={cn(
-              "h-9 w-9 rounded-lg transition-all duration-200",
+              "h-12 w-12 rounded-lg transition-all duration-200",
               isPrivacyMode
                 ? "text-brand bg-brand/10 hover:bg-brand/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -78,9 +78,9 @@ export function Header() {
             title={isPrivacyMode ? "Tutarları göster" : "Tutarları gizle"}
           >
             {isPrivacyMode ? (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="h-12 w-12" />
             ) : (
-              <Eye className="h-4 w-4" />
+              <Eye className="h-12 w-12" />
             )}
           </Button>
 
